@@ -3,6 +3,7 @@ from beanie import Document, Link
 from typing import List
 from card import Card
 from enums.enums import DeckFormat
+from user import User
 
 class Deck(Document):
     name: str
