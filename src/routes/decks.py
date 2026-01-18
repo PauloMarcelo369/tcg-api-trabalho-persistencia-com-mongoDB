@@ -50,10 +50,6 @@ async def add_cards_to_deck_helper(deck, card_ids: list[str]):
     return deck
 
 
-
-from fastapi import HTTPException
-from beanie import PydanticObjectId
-
 async def remove_card_from_deck_helper(deck, card_id: str):
     """
     Remove uma carta de um deck existente.

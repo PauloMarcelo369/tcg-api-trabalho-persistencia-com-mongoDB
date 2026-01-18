@@ -1,7 +1,7 @@
 from datetime import datetime
 from beanie import Document
 from typing import List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from beanie import PydanticObjectId
 
