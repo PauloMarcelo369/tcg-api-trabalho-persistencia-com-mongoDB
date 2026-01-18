@@ -1,12 +1,11 @@
 import logging
 from contextlib import asynccontextmanager
+from fastapi_pagination import add_pagination
 
 from fastapi import FastAPI
 
 from src.core.database import close_db, init_db
-from src.routes.users import router as users_router
-from src.routes.cards import router as cards_router
-# from src.routes 
+from src.routes import collections 
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,6 +48,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+add_pagination(app)
+
+app.include_router(collections.router)
+
+
 @app.get("/")
 async def root():
     """Rota raiz da API"""
@@ -62,7 +66,3 @@ async def root():
 async def health_check():
     """Health check para verificar se a API está rodando"""
     return {"status": "healthy", "service": "API de Filmes"}
-
-app.include_router(users_router)
-app.include_router(cards_router)
-
