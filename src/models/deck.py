@@ -6,10 +6,14 @@ from src.models.card import Card
 from src.models.enums.enums import DeckFormat
 from src.models.user import User
 
+
+class AddCardsRequest(BaseModel):
+    card_ids: List[str]
+
 class Deck(Document):
-    name: str
+    name: str = Field(..., min_length=2, max_length=100)
     format: DeckFormat
-    created_at: datetime = datetime.now()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     owner: Link["User"] 
     cards: List[Link[Card]] = []
 
@@ -20,7 +24,6 @@ class DeckCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
     format: DeckFormat
     owner_id: str
-    card_ids: List[str] = Field(..., min_items=1)
 
 
 class DeckUpdate(BaseModel):
@@ -33,7 +36,7 @@ class DeckResponse(BaseModel):
     name: str
     format: DeckFormat
     created_at: datetime
-    owner_id: str
+    owner: User        
     cards_ids: List[str]
 
     class Config:

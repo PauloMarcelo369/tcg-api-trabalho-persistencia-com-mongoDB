@@ -160,7 +160,7 @@ async def collections_with_card_count():
         },
         {
             "$project": {
-                "_id": {"$toString": "$_id"},  # 🔥 CONVERTE ObjectId
+                "_id": {"$toString": "$_id"},  
                 "name": 1,
                 "total_cards": {"$size": "$cards"}
             }

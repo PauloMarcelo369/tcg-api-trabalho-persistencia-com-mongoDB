@@ -5,7 +5,7 @@ from fastapi_pagination import add_pagination
 from fastapi import FastAPI
 
 from src.core.database import close_db, init_db
-from src.routes import collections 
+from src.routes import collections, decks
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,6 +51,7 @@ app = FastAPI(
 add_pagination(app)
 
 app.include_router(collections.router)
+app.include_router(decks.router)
 
 
 @app.get("/")
