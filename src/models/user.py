@@ -9,7 +9,7 @@ class User(Document):
     name: str
     email: str
     password: str
-    created_at: datetime = datetime.now()
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
         name = "users"
