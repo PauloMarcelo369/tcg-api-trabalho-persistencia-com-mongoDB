@@ -1,12 +1,13 @@
+```mermaid
 classDiagram
-class Card {
-ObjectId id
-string name
-CardType type
-CardRarity rarity
-string? text
-ObjectId collection_id
-}
+    class Card {
+        ObjectId id
+        string name
+        CardType type
+        CardRarity rarity
+        string? text
+        ObjectId collection_id
+    }
 
     class Collection {
         ObjectId id
@@ -31,7 +32,7 @@ ObjectId collection_id
         datetime created_at
     }
 
-    %% Relações
     Card --> Collection : collection_id
     Deck --> User : owner_id
     Deck --> Card : cards_ids
+```
