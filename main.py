@@ -66,6 +66,3 @@ async def root():
 async def health_check():
     """Health check para verificar se a API está rodando"""
     return {"status": "healthy", "service": "API de Filmes"}
-
-
-
