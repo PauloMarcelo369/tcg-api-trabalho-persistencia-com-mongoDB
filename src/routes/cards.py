@@ -86,37 +86,6 @@ async def search_card_by_name(name: str, skip: int = 0, limit: int = Query(10, l
     
     return [CardRead(**c.model_dump(), collection=c.collection) for c in cards]
 
-@router.get("/collection/{collection_id}", response_model=List[CardRead], status_code=status.HTTP_200_OK)
-async def get_cards_by_collection(collection_id: PydanticObjectId, skip: int = 0, limit: int = Query(10, le=50)):
-    """Busca todas as cartas de uma coleção específica"""
-    collection = await Collection.get(collection_id)
-    if not collection:
-        raise HTTPException(404, f"Collection com ID {collection_id} não existe!")
-    cards = await Card.find(Card.collection.id == collection.id).skip(skip).limit(limit).to_list()
-    return [CardRead(**c.model_dump(), collection=c.collection) for c in cards]
-
-
-@router.get("/stats/by-collection", status_code=status.HTTP_200_OK)
-async def cards_per_collection_stats():
-    """Estatísticas: Contagem de cartas por coleção (com nome da coleção)"""
-    pipeline = [
-        {"$group": {"_id": "$collection.$id", "total_cards": {"$sum": 1}}},
-        {"$lookup": {
-            "from": "collections",
-            "localField": "_id",
-            "foreignField": "_id",
-            "as": "collection_info"
-        }},
-        {"$unwind": "$collection_info"},
-        {"$sort": {"total_cards": -1}},
-        {"$project": {
-            "collection_name": "$collection_info.name", 
-            "total_cards": 1, 
-            "_id": 0
-        }}
-    ]
-    
-    return await Card.aggregate(pipeline).to_list()
 
 @router.get("/stats/by-rarity", status_code=status.HTTP_200_OK)
 async def cards_by_rarity_stats():
