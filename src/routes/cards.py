@@ -1,6 +1,9 @@
-from typing import List, Dict, Any
+import re
 from fastapi import APIRouter, HTTPException, status, Query
 from beanie import PydanticObjectId
+from fastapi_pagination import Page
+from fastapi_pagination.ext.beanie import apaginate
+
 from src.models.card import Card, CardCreate, CardRead, CardUpdate
 from src.models.collection import Collection
 
@@ -12,28 +15,25 @@ async def create_card(data: CardCreate):
     existing = await Card.find_one(Card.name == data.name)
     if existing:
         raise HTTPException(status_code=400, detail="Carta com esse nome já existe!")
+    
     collection = await Collection.get(data.collection_id)
     if not collection:
         raise HTTPException(status_code=404, detail=f"Collection com ID {data.collection_id} não existe!")
-
-    try:
-        card = Card(
-            name=data.name,
-            type=data.type,
-            rarity=data.rarity,
-            text=data.text,
-            collection=collection
-        )
-        await card.insert()
-        return CardRead(**card.model_dump(), collection=card.collection)
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao criar carta: {e}")
+    card = Card(
+        name=data.name,
+        type=data.type,
+        rarity=data.rarity,
+        text=data.text,
+        collection=collection
+    )
+    await card.insert()
+    
+    return CardRead(**card.model_dump(), collection=card.collection)
 
 @router.get("/{card_id}", response_model=CardRead, status_code=status.HTTP_200_OK)
 async def get_card_by_id(card_id: PydanticObjectId):
     """Busca carta por ID"""
-    card = await Card.get(card_id)
+    card = await Card.get(card_id, fetch_links=True)
     if not card:
         raise HTTPException(404, f"Carta com ID {card_id} não existe!")
     return CardRead(**card.model_dump(), collection=card.collection)
@@ -71,21 +71,27 @@ async def update_card(card_id: PydanticObjectId, updated_card: CardUpdate):
     await card.save()
     return CardRead(**card.model_dump(), collection=card.collection)
 
-@router.get("/", response_model=List[CardRead], status_code=status.HTTP_200_OK)
-async def list_cards(skip: int = 0, limit: int = 10):
-    """Lista todas as cartas com paginação"""
-    cards = await Card.find_all().skip(skip).limit(limit).to_list()
-    return [CardRead(**c.model_dump(), collection=c.collection) for c in cards]
+@router.get("/", response_model=Page[CardRead], status_code=status.HTTP_200_OK)
+async def list_cards():
+    """Lista todas as cartas com paginação automática"""
+    return await apaginate(Card.find_all(fetch_links=True))
 
-@router.get("/search/{name}", response_model=List[CardRead], status_code=status.HTTP_200_OK)
-async def search_card_by_name(name: str, skip: int = 0, limit: int = Query(10, le=50)):
-    """Busca cartas por nome (Case Insensitive)"""
-    cards = await Card.find(
-        {"name": {"$regex": name, "$options": "i"}}
-    ).skip(skip).limit(limit).to_list()
+@router.get("/search", response_model=Page[CardRead], status_code=status.HTTP_200_OK)
+async def search_cards(
+    query: str = Query(..., min_length=2, description="Texto para busca no nome da carta")
+):
+    """
+    Busca cartas por nome (Case Insensitive) com paginação.
+    Substitui a rota /search/{name} para manter padrão Query param.
+    """
+    regex = re.compile(query, re.IGNORECASE)
     
-    return [CardRead(**c.model_dump(), collection=c.collection) for c in cards]
-
+    return await apaginate(
+        Card.find(
+            {"name": {"$regex": regex}},
+            fetch_links=True
+        )
+    )
 
 @router.get("/stats/by-rarity", status_code=status.HTTP_200_OK)
 async def cards_by_rarity_stats():

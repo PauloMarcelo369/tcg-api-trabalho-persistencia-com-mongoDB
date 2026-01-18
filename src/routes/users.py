@@ -1,6 +1,8 @@
-from typing import List, Dict
+from typing import Dict
 from fastapi import APIRouter, HTTPException, status
 from beanie import PydanticObjectId
+from fastapi_pagination import Page
+from fastapi_pagination.ext.beanie import apaginate
 
 from src.models.user import User, UserCreate, UserRead, UserUpdate
 from src.models.deck import Deck
@@ -13,17 +15,13 @@ async def create_user(data: UserCreate):
     existing = await User.find_one(User.email == data.email)
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado!")
-
-    try:
-        user = User(
-            name=data.name,
-            email=data.email,
-            password=data.password
-        )
-        await user.insert()
-        return user
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao criar usuário: {str(e)}")
+    user = User(
+        name=data.name,
+        email=data.email,
+        password=data.password
+    )
+    await user.insert()
+    return user
 
 @router.get("/{user_id}", response_model=UserRead, status_code=status.HTTP_200_OK)
 async def get_user_by_id(user_id: PydanticObjectId):
@@ -33,11 +31,10 @@ async def get_user_by_id(user_id: PydanticObjectId):
         raise HTTPException(404, f"Usuário com ID {user_id} não existe!")
     return user
 
-@router.get("/", response_model=List[UserRead], status_code=status.HTTP_200_OK)
+@router.get("/", response_model=Page[UserRead], status_code=status.HTTP_200_OK)
 async def list_users():
-    """Retorna todos os usuários"""
-    users = await User.find_all().to_list()
-    return users
+    """Retorna todos os usuários com paginação"""
+    return await apaginate(User.find_all())
 
 @router.get("/{user_id}/decks/count", response_model=int, status_code=status.HTTP_200_OK)
 async def count_user_decks(user_id: PydanticObjectId):
@@ -67,15 +64,14 @@ async def count_user_decks_by_format(user_id: PydanticObjectId) -> Dict[str, int
 
     return result
 
-@router.get("/{user_id}/decks", status_code=status.HTTP_200_OK)
+@router.get("/{user_id}/decks", response_model=Page[Deck], status_code=status.HTTP_200_OK)
 async def list_user_decks(user_id: PydanticObjectId):
-    """Lista todos os decks do usuário"""
+    """Lista todos os decks do usuário com paginação"""
     user = await User.get(user_id)
     if not user:
         raise HTTPException(404, f"Usuário com ID {user_id} não existe!")
 
-    decks = await Deck.find(Deck.owner.id == user.id).to_list()
-    return decks
+    return await apaginate(Deck.find(Deck.owner.id == user.id))
 
 @router.put("/{user_id}", response_model=UserRead, status_code=status.HTTP_200_OK)
 async def update_user(user_id: PydanticObjectId, updated_user: UserUpdate):
