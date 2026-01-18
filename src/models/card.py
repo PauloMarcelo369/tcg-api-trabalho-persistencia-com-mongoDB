@@ -1,7 +1,7 @@
 from beanie import Document, Link
 from typing import Optional
-from enums.enums import CardRarity, CardType
-from collection import Collection
+from src.models.enums.enums import CardType, CardRarity
+from src.models.collection import Collection
 
 class Card(Document):
     name: str

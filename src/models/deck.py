@@ -1,9 +1,9 @@
 from datetime import datetime
 from beanie import Document, Link
 from typing import List
-from card import Card
-from enums.enums import DeckFormat
-from user import User
+from src.models.card import Card
+from src.models.enums.enums import DeckFormat
+from src.models.user import User
 
 class Deck(Document):
     name: str
