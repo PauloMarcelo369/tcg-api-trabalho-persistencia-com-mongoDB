@@ -64,7 +64,7 @@ class CardUpdate(BaseModel):
     type: Optional[CardType] = Field(
         None, 
         title="Tipo",
-        examples=[CardType.Artifact]
+        examples=[CardType.Spell]
     )
     rarity: Optional[CardRarity] = Field(
         None, 

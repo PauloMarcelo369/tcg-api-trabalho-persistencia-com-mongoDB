@@ -16,7 +16,9 @@ router = APIRouter(prefix="/users", tags=["Users"])
     summary="Criar novo usuário",
     description="Registra um novo usuário no sistema. O e-mail deve ser único.",
     responses={
-        400: {"description": "E-mail já cadastrado"}
+        201: {"description": "Usuário criado com sucesso"},
+        400: {"description": "Erro de Negócio: E-mail já cadastrado"},
+        422: {"description": "Erro de Validação: Dados inválidos (ex: senha curta, email inválido)"}
     }
 )
 async def create_user(data: UserCreate):
@@ -39,7 +41,9 @@ async def create_user(data: UserCreate):
     summary="Buscar usuário por ID",
     description="Retorna os detalhes públicos de um usuário específico.",
     responses={
-        404: {"description": "Usuário não encontrado"}
+        200: {"description": "Usuário encontrado"},
+        404: {"description": "Usuário não encontrado"},
+        422: {"description": "ID inválido"}
     }
 )
 async def get_user_by_id(
@@ -56,7 +60,10 @@ async def get_user_by_id(
     response_model=Page[UserRead], 
     status_code=status.HTTP_200_OK,
     summary="Listar todos os usuários",
-    description="Retorna uma lista paginada de todos os usuários cadastrados."
+    description="Retorna uma lista paginada de todos os usuários cadastrados.",
+    responses={
+        200: {"description": "Lista de usuários recuperada com sucesso"}
+    }
 )
 async def list_users():
     """Retorna todos os usuários com paginação"""
@@ -69,8 +76,10 @@ async def list_users():
     summary="Atualizar usuário",
     description="Atualiza nome, email ou senha de um usuário existente.",
     responses={
+        200: {"description": "Usuário atualizado com sucesso"},
+        400: {"description": "Erro de Requisição: Nenhum dado enviado para atualização"},
         404: {"description": "Usuário não encontrado"},
-        400: {"description": "Nenhum dado enviado para atualização"}
+        422: {"description": "Erro de Validação"}
     }
 )
 async def update_user(
@@ -99,7 +108,9 @@ async def update_user(
     summary="Excluir usuário",
     description="Remove permanentemente um usuário do banco de dados.",
     responses={
-        404: {"description": "Usuário não encontrado"}
+        204: {"description": "Usuário removido com sucesso"},
+        404: {"description": "Usuário não encontrado"},
+        422: {"description": "ID inválido"}
     }
 )
 async def delete_user(

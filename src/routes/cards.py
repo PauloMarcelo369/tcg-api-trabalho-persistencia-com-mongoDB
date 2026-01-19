@@ -9,6 +9,85 @@ from src.models.collection import Collection
 
 router = APIRouter(prefix="/cards", tags=["Cards"])
 
+@router.get(
+    "/search", 
+    response_model=Page[CardRead], 
+    status_code=status.HTTP_200_OK,
+    summary="Buscar cartas por nome",
+    description="Realiza uma busca textual (case-insensitive) no nome das cartas.",
+    responses={
+        200: {"description": "Busca realizada com sucesso"},
+        422: {"description": "Erro de validação (ex: query muito curta)"}
+    }
+)
+async def search_cards(
+    query: str = Query(..., min_length=2, description="Texto parcial para busca no nome da carta (ex: 'dragon')")
+):
+    """
+    Busca cartas por nome (Case Insensitive) com paginação.
+    """
+    regex = re.compile(query, re.IGNORECASE)
+    
+    return await apaginate(
+        Card.find(
+            {"name": {"$regex": regex}},
+            fetch_links=True
+        )
+    )
+
+@router.get(
+    "/stats/by-rarity", 
+    status_code=status.HTTP_200_OK,
+    summary="Estatísticas: Por Raridade",
+    description="Retorna a contagem total de cartas agrupadas por raridade.",
+    responses={
+        200: {"description": "Estatísticas geradas com sucesso"}
+    }
+)
+async def cards_by_rarity_stats():
+    """Estatísticas: Contagem por raridade"""
+    pipeline = [
+        {"$group": {"_id": "$rarity", "total_cards": {"$sum": 1}}},
+        {"$sort": {"total_cards": -1}},
+        {"$project": {"rarity": "$_id", "total_cards": 1, "_id": 0}}
+    ]
+    return await Card.aggregate(pipeline).to_list()
+
+@router.get(
+    "/stats/by-type", 
+    status_code=status.HTTP_200_OK,
+    summary="Estatísticas: Por Tipo",
+    description="Retorna a contagem total de cartas agrupadas por tipo.",
+    responses={
+        200: {"description": "Estatísticas geradas com sucesso"}
+    }
+)
+async def cards_by_type_stats():
+    """Estatísticas: Contagem por tipo"""
+    pipeline = [
+        {"$group": {"_id": "$type", "total_cards": {"$sum": 1}}},
+        {"$sort": {"total_cards": -1}},
+        {"$project": {"type": "$_id", "total_cards": 1, "_id": 0}}
+    ]
+    return await Card.aggregate(pipeline).to_list()
+
+@router.get(
+    "/", 
+    response_model=Page[CardRead], 
+    status_code=status.HTTP_200_OK,
+    summary="Listar todas as cartas",
+    description="Retorna lista paginada de todas as cartas do sistema.",
+    responses={
+        200: {"description": "Listagem retornada com sucesso"}
+    }
+)
+async def list_cards():
+    """Lista todas as cartas com paginação automática"""
+    return await apaginate(Card.find_all(fetch_links=True))
+
+
+
+
 @router.post(
     "/", 
     response_model=CardRead, 
@@ -16,8 +95,10 @@ router = APIRouter(prefix="/cards", tags=["Cards"])
     summary="Criar nova carta",
     description="Cria uma carta associada a uma coleção existente. O nome da carta deve ser único.",
     responses={
-        400: {"description": "Carta com esse nome já existe"},
-        404: {"description": "Coleção informada não encontrada"}
+        201: {"description": "Carta criada com sucesso"},
+        400: {"description": "Erro de Negócio: Carta com esse nome já existe"},
+        404: {"description": "Erro de Dependência: Coleção informada não encontrada"},
+        422: {"description": "Erro de Validação: Campos obrigatórios inválidos ou ausentes"}
     }
 )
 async def create_card(data: CardCreate):
@@ -38,7 +119,7 @@ async def create_card(data: CardCreate):
     )
     await card.insert()
     
-    return CardRead(**card.model_dump(), collection=card.collection)
+    return CardRead(**card.model_dump(exclude={'collection'}), collection=card.collection)
 
 @router.get(
     "/{card_id}", 
@@ -47,7 +128,9 @@ async def create_card(data: CardCreate):
     summary="Buscar carta por ID",
     description="Retorna os detalhes de uma carta específica.",
     responses={
-        404: {"description": "Carta não encontrada"}
+        200: {"description": "Carta encontrada e retornada"},
+        404: {"description": "Carta não encontrada"},
+        422: {"description": "ID inválido (formato ObjectID incorreto)"}
     }
 )
 async def get_card_by_id(
@@ -57,14 +140,17 @@ async def get_card_by_id(
     card = await Card.get(card_id, fetch_links=True)
     if not card:
         raise HTTPException(404, f"Carta com ID {card_id} não existe!")
-    return CardRead(**card.model_dump(), collection=card.collection)
+    return CardRead(**card.model_dump(exclude={'collection'}), collection=card.collection)
 
 @router.delete(
     "/{card_id}", 
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Excluir carta",
+    description="Remove permanentemente uma carta do sistema.",
     responses={
-        404: {"description": "Carta não encontrada"}
+        204: {"description": "Carta excluída com sucesso (sem conteúdo de retorno)"},
+        404: {"description": "Carta não encontrada"},
+        422: {"description": "ID inválido"}
     }
 )
 async def delete_card(
@@ -84,8 +170,10 @@ async def delete_card(
     summary="Atualizar carta",
     description="Atualiza campos de uma carta. Se o collection_id for alterado, a carta é movida para outra coleção.",
     responses={
-        404: {"description": "Carta ou nova Coleção não encontrada"},
-        400: {"description": "Nenhum dado enviado para atualização"}
+        200: {"description": "Carta atualizada com sucesso"},
+        400: {"description": "Erro de Requisição: Nenhum dado enviado para atualização"},
+        404: {"description": "Recurso não encontrado: Carta ou nova Coleção não existem"},
+        422: {"description": "Erro de Validação: Tipos de dados incorretos"}
     }
 )
 async def update_card(
@@ -112,67 +200,4 @@ async def update_card(
         setattr(card, key, value)
     
     await card.save()
-    return CardRead(**card.model_dump(), collection=card.collection)
-
-@router.get(
-    "/", 
-    response_model=Page[CardRead], 
-    status_code=status.HTTP_200_OK,
-    summary="Listar todas as cartas",
-    description="Retorna lista paginada de todas as cartas do sistema."
-)
-async def list_cards():
-    """Lista todas as cartas com paginação automática"""
-    return await apaginate(Card.find_all(fetch_links=True))
-
-@router.get(
-    "/search", 
-    response_model=Page[CardRead], 
-    status_code=status.HTTP_200_OK,
-    summary="Buscar cartas por nome",
-    description="Realiza uma busca textual (case-insensitive) no nome das cartas."
-)
-async def search_cards(
-    query: str = Query(..., min_length=2, description="Texto parcial para busca no nome da carta (ex: 'dragon')")
-):
-    """
-    Busca cartas por nome (Case Insensitive) com paginação.
-    """
-    regex = re.compile(query, re.IGNORECASE)
-    
-    return await apaginate(
-        Card.find(
-            {"name": {"$regex": regex}},
-            fetch_links=True
-        )
-    )
-
-@router.get(
-    "/stats/by-rarity", 
-    status_code=status.HTTP_200_OK,
-    summary="Estatísticas: Por Raridade",
-    description="Retorna a contagem total de cartas agrupadas por raridade."
-)
-async def cards_by_rarity_stats():
-    """Estatísticas: Contagem por raridade"""
-    pipeline = [
-        {"$group": {"_id": "$rarity", "total_cards": {"$sum": 1}}},
-        {"$sort": {"total_cards": -1}},
-        {"$project": {"rarity": "$_id", "total_cards": 1, "_id": 0}}
-    ]
-    return await Card.aggregate(pipeline).to_list()
-
-@router.get(
-    "/stats/by-type", 
-    status_code=status.HTTP_200_OK,
-    summary="Estatísticas: Por Tipo",
-    description="Retorna a contagem total de cartas agrupadas por tipo."
-)
-async def cards_by_type_stats():
-    """Estatísticas: Contagem por tipo"""
-    pipeline = [
-        {"$group": {"_id": "$type", "total_cards": {"$sum": 1}}},
-        {"$sort": {"total_cards": -1}},
-        {"$project": {"type": "$_id", "total_cards": 1, "_id": 0}}
-    ]
-    return await Card.aggregate(pipeline).to_list()
+    return CardRead(**card.model_dump(exclude={'collection'}), collection=card.collection)
